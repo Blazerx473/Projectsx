@@ -1,0 +1,661 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+from tkcalendar import DateEntry
+from PIL import Image, ImageTk
+import mysql.connector
+import random  # For simulating payment
+from tkinter import Toplevel, Label, CENTER, Frame
+from tkinter.font import Font
+import tkinter as tk
+from tkinter import Entry, Label, Button, Frame, BOTH
+
+# Initialize the database
+# Initialize the database
+def init_db():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('CREATE DATABASE IF NOT EXISTS theatre_db')
+    conn.commit()
+    conn.close()
+
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                        username VARCHAR(255) PRIMARY KEY,
+                        password VARCHAR(255) NOT NULL)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS bookings (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        username VARCHAR(255),
+                        movie VARCHAR(255),
+                        date DATE,
+                        time VARCHAR(255),
+                        theatre VARCHAR(255),
+                        seats TEXT,
+                        price DECIMAL(10, 2),
+                        FOREIGN KEY(username) REFERENCES users(username))''')
+    conn.commit()
+    conn.close()
+
+# Register a new user
+def register_user(username, password):
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO users (username, password) VALUES (%s, %s)', (username, password))
+        conn.commit()
+        messagebox.showinfo("Success", "Registration successful!")
+    except mysql.connector.IntegrityError:
+        messagebox.showerror("Error", "Username already exists.")
+    conn.close()
+
+# Authenticate user login
+def login_user(username, password):
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE username=%s AND password=%s', (username, password))
+    user = cursor.fetchone()
+    conn.close()
+    return user is not None
+
+# Set the background image for the window
+def set_background_image(root, image_path, screen_width, screen_height):
+    image = Image.open(image_path)
+    image = image.resize((screen_width, screen_height))  # Resize the image to fit the screen
+    photo = ImageTk.PhotoImage(image)
+    background_label = Label(root, image=photo)
+    background_label.image = photo
+    background_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+# Create login widgets
+def create_login_widgets(root, current_user):
+    for widget in root.winfo_children():
+        if isinstance(widget, Label):
+            continue
+        widget.destroy()
+    
+    login_frame = tk.Frame(root, bg="lightblue")
+    login_frame.place(relx=0.5, rely=0.5, anchor=CENTER)
+    root.login_frame = login_frame
+    tk.Label(login_frame, text="Username", bg="lightblue", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=5)
+    username_entry = tk.Entry(login_frame, font=("Arial", 14))
+    username_entry.grid(row=0, column=1, padx=10, pady=5)
+
+    tk.Label(login_frame, text="Password", bg="lightblue", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=5)
+    password_entry = tk.Entry(login_frame, show='*', font=("Arial", 14))
+    password_entry.grid(row=1, column=1, padx=10, pady=5)
+
+    tk.Button(login_frame, text="Login", command=lambda: login(root, current_user, username_entry, password_entry, login_frame), 
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).grid(row=2, column=0, padx=10, pady=10)
+
+    tk.Button(login_frame, text="Register", command=lambda: register(root, current_user, username_entry, password_entry, login_frame),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).grid(row=2, column=1, padx=10, pady=10)
+
+
+# Home Screen# Home Screen
+
+def show_home_screen(root, current_user):
+    home_frame = tk.Frame(root, bg="lightblue")
+    home_frame.place(relx=0.5, rely=0.5, anchor=CENTER)
+    root.home_frame = home_frame  # Save the reference to the home frame
+
+    # Header Section
+    header_frame = tk.Frame(home_frame, bg="lightblue")
+    header_frame.pack(pady= 10)
+
+    tk.Label(header_frame, text="Welcome , " + current_user[0], bg ="lightblue", font=("Arial", 16)).pack(side =tk.LEFT, padx=10)
+    tk.Button(header_frame, text="Logout", command=lambda: logout(root, current_user), relief="flat", bg="#FF4C4C", fg="white", font=("Arial", 12)).pack(side=tk.RIGHT, padx=10)
+
+    # Movie Section
+    movie_frame = tk.Frame(home_frame, bg="lightblue")
+    movie_frame.pack(pady=10)
+
+    tk.Label(movie_frame, text="Now Showing", bg="lightblue", font=("Arial", 16)).pack(pady=10)
+
+    # Movie Cards
+    movie_cards_frame = tk.Frame(movie_frame, bg="lightblue")
+    movie_cards_frame.pack(pady=10)
+
+    movie_cards = []
+    movie_titles = ["Men in Black", "Venom", "Deadpool", "Spiderman", "Iron-Man"]
+    movie_pictures = [r"C:\Users\Lenovo\Downloads\download.jpeg", r"C:\Users\Lenovo\Downloads\12145-1.jpg", r"C:\Users\Lenovo\Downloads\images (1).jpeg", r"C:\Users\Lenovo\Downloads\images (2).jpeg", r"C:\Users\Lenovo\Downloads\s-l500.jpg"]
+    for i in range(5):
+        movie_card = tk.Frame(movie_cards_frame, bg="white", highlightbackground="black", highlightthickness=1)
+        movie_card.pack(side=tk.LEFT, padx=10, pady=10)
+
+        tk.Label(movie_card, text=movie_titles[i], bg="white", font=("Arial", 14)).pack(pady=10)
+
+        # Display movie picture
+        movie_picture = Image.open(movie_pictures[i])
+        movie_picture.thumbnail((100, 150))  # Resize the picture to fit the card
+        photo = ImageTk.PhotoImage(movie_picture)
+        movie_picture_label = tk.Label(movie_card, image=photo)
+        movie_picture_label.image = photo
+        movie_picture_label.pack(pady=5)
+
+        tk.Label(movie_card, text="Genre: Action, Comedy", bg="white", font=("Arial", 12)).pack(pady=5)
+        tk.Label(movie_card, text="Duration: 2h 30m", bg="white", font=("Arial", 12)).pack(pady=5)
+        tk.Label(movie_card, text="Rating: 4.5/5", bg="white", font=("Arial", 12)).pack(pady=5)
+
+        tk.Button(movie_card, text="Book Now", command=lambda title=movie_titles[i]: transition_to_booking(root, current_user, title, home_frame),
+                  relief="flat", bg="#007BFF", fg="white", font=("Arial ", 12)).pack(pady=10)
+
+        movie_cards.append(movie_card)
+
+    # Footer Section
+    footer_frame = tk.Frame(home_frame, bg="lightblue")
+    footer_frame.pack(pady=10)
+
+    tk.Label(footer_frame, text="Copyright 2024 Theatre Booking System", bg="lightblue", font=("Arial", 12)).pack(pady=10)
+
+# Transition to booking screen
+def transition_to_booking(root, current_user, title, home_frame):
+    home_frame.destroy()  # Destroy the home frame
+    show_booking_screen(root, current_user, title)
+
+# Logout
+def logout(root, current_user):
+    current_user[0] = None
+    if hasattr(root, 'booking_frame'):
+        root.booking_frame.destroy()
+    if hasattr(root, 'home_frame'):
+        root.home_frame.destroy()
+    if hasattr(root, 'ticket_frame'):
+        root.ticket_frame.destroy()
+    for widget in root.winfo_children():
+        if isinstance(widget, Label):
+            continue
+        widget.destroy()
+    create_login_widgets(root, current_user)
+
+# Handle user login
+def login(root, current_user, username_entry, password_entry, frame_to_clear):
+    username = username_entry.get().strip()
+    password = password_entry.get().strip()
+
+    if not username or not password:
+        messagebox.showerror("Error", "Please enter both username and password.")
+        return
+
+    if login_user(username, password):
+        current_user[0] = username
+        messagebox.showinfo("Success", f"Welcome, {username}!")
+        if frame_to_clear is not None:
+            frame_to_clear.pack_forget()  # Clear the login frame
+        show_home_screen(root, current_user)
+    else:
+        messagebox.showerror("Error", "Invalid username or password.")
+
+# Handle user registration
+def register(root, current_user, username_entry, password_entry, frame_to_clear):
+    username = username_entry.get ().strip()
+    password = password_entry.get().strip()
+
+    if not username or not password:
+        messagebox.showerror("Error", "Please enter both username and password.")
+        return
+
+    register_user(username, password)
+    login(root, current_user, username_entry, password_entry, frame_to_clear)
+
+
+# Show the booking screen after login
+def show_booking_screen(root, current_user, title=None):
+    booking_frame = tk.Frame(root, bg="lightblue")
+    booking_frame.place(relx=0.5, rely=0.5, anchor=CENTER)
+    root.booking_frame = booking_frame  # Save the reference to clear it later for refresh
+
+    # Movie options and prices
+    movie_prices = {"Men in Black": 750.00, "Venom": 950.00, "Deadpool" :180.00, "Spiderman":200, "Iron-Man": 890.00}
+    
+    # Select Movie
+    tk.Label(booking_frame, text="Select Movie", bg="lightblue", font=("Arial", 14)).grid(row=0, column=0, padx=10, pady=5)
+    movie_var = tk.StringVar()
+    movie_menu = tk.OptionMenu(booking_frame, movie_var, *movie_prices.keys())
+    movie_menu.config(font=("Arial", 12), width=20)
+    movie_menu.grid(row=0, column=1, padx=10, pady=5)
+    if title:
+        movie_var.set(title)  # Set the selected movie
+    else:
+        movie_var.set(next(iter(movie_prices)))  # Set default selection
+    # Select Theatre
+    tk.Label(booking_frame, text="Select Theatre", bg="lightblue", font=("Arial", 14)).grid(row=1, column=0, padx=10, pady=5)
+    theatre_var = tk.StringVar()
+    theatre_menu = tk.OptionMenu(booking_frame, theatre_var, "Luxe Cinemas", "PVR Palazzo", "PVR Grand Mall")
+    theatre_menu.config(font=("Arial", 12), width=30)
+    theatre_menu.grid(row=1, column=1, padx=10, pady=5)
+    theatre_var.set("")  # Reset the selected theatre
+
+    # Select Date
+    tk.Label(booking_frame, text="Select Date", bg="lightblue", font=("Arial", 14)).grid(row=2, column=0, padx=10, pady=5)
+    date_entry = DateEntry(booking_frame, font=("Arial", 12))
+    date_entry.grid(row=2, column=1, padx=10, pady=5)
+    date_entry.set_date(None)  # Reset the selected date
+
+    # Select Time
+    tk.Label(booking_frame, text="Select Time", bg="lightblue", font=("Arial", 14)).grid(row=3, column=0, padx=10, pady=5)
+    time_var = tk.StringVar()
+    time_menu = tk.OptionMenu(booking_frame, time_var, "10:00 AM", "02:00 PM", "06:00 PM")
+    time_menu.config(font=("Arial", 12), width=20)
+    time_menu.grid(row=3, column=1, padx=10, pady=5)
+    time_var.set("")  # Reset the selected time
+
+    # Select Seats
+    tk.Label(booking_frame, text="Select Seats", bg="lightblue", font=("Arial", 14)).grid(row=4, column=0, padx=10, pady=5)
+    seat_selection_frame = tk.Frame(booking_frame, bg="lightblue")
+    seat_selection_frame.grid(row=4, column=1, padx=10, pady=5)
+
+    seat_buttons = {}
+    selected_seats = []
+    total_price = 0
+    total_price_label = tk.Label(booking_frame, text="Total Price: ₹0.00", bg="lightblue", font=("Arial", 14), name="total_price_label")
+    total_price_label.grid(row=5, column=0, columnspan=2, pady=10)
+
+    def update_total_price(seat_id):
+        nonlocal total_price
+        nonlocal selected_seats
+        if seat_id in selected_seats:
+            total_price -= movie_prices[movie_var.get()]
+            selected_seats.remove(seat_id)
+        else:
+            total_price += movie_prices[movie_var.get()]
+            selected_seats.append(seat_id)
+        total_price_label.config(text=f"Total Price: ₹{total_price:.2f}")
+
+    create_seat_buttons(seat_selection_frame, seat_buttons, current_user, update_total_price)
+
+    # Book Button
+    tk.Button(booking_frame, text="Book", command=lambda: initiate_payment(root, current_user, movie_var, date_entry, time_var, theatre_var, seat_buttons, movie_prices, total_price, total_price_label),
+              relief="flat", bg ="#007BFF", fg="white", font=("Arial", 12)).grid(row=6, column=0, padx=10, pady=10)
+
+    # View Booked Seats Button
+    tk.Button(booking_frame, text="View Booked Seats", command=lambda: view_bookings(current_user),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).grid(row=6, column=1, padx=10, pady=10)
+
+    # Refresh Button
+    tk.Button(booking_frame, text="Refresh", command=lambda: refresh_booking(root, movie_var),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).grid(row=8, column=0, padx =10, pady=10)                  
+                      
+    
+    # Back Button
+    tk.Button(booking_frame, text="Back", command=lambda: back_to_menu(root, current_user),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).grid(row=8, column=1, padx=10, pady=10)
+
+    root.booking_frame = booking_frame
+
+
+
+# Back to menu function
+def back_to_menu(root, current_user):
+    back_frame = tk.Frame(root, bg="lightblue")
+    back_frame.place(relx=0.5, rely=0.5, anchor=CENTER)
+
+    tk.Label(back_frame, text="What would you like to do?", bg="lightblue", font=("Arial", 16)).pack(pady=10)
+
+    tk.Button(back_frame, text="Goto Login Page", command=lambda: goto_login_page(root, current_user, back_frame),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+    tk.Button(back_frame, text="Goto Home Screen", command=lambda: goto_home_screen(root, current_user, back_frame),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+# Goto login page function
+def goto_login_page(root, current_user, back_frame):
+    back_frame.destroy()
+    current_user[0] = None
+    create_login_widgets(root, current_user)
+
+# Goto home screen function# Goto home screen function
+def goto_home_screen(root, current_user, back_frame):
+    back_frame.destroy()
+    if hasattr(root, 'booking_frame'):
+        root.booking_frame.destroy()
+    show_home_screen(root, current_user)
+
+    
+# Create seat buttons
+def create_seat_buttons(frame, seat_buttons, current_user, update_total_price):
+    reserved_seats = get_reserved_seats()  # Get reserved seats
+    random_reserved_seats = get_random_reserved_seats()  # Get random reserved seats
+    for row in range(ord('A'), ord('F') + 1):
+        for col in range(1, 11):
+            seat_id = f"{chr(row)}{col}"
+            if seat_id in reserved_seats or seat_id in random_reserved_seats:
+                # Reserved seats are green and disabled
+                btn = tk.Button(frame, text=seat_id, width=5, height=2, bg="green", fg="black", state="disabled", font=("Arial", 12))
+            else:
+                # Available seats are grey and enabled
+                btn = tk.Button(frame, text=seat_id, width=5, height=2, bg="gray", fg="black", font=("Arial", 12), command=lambda s=seat_id: toggle_seat(seat_buttons, s, update_total_price))
+            btn.grid(row=row - ord('A'), column=col - 1, padx=5, pady=5)
+            seat_buttons[seat_id] = btn
+
+# Get reserved seats
+def get_reserved_seats():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database ="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('SELECT seats FROM bookings')
+    bookings = cursor.fetchall()
+    conn.close()
+
+    reserved_seats = []
+    for booking in bookings:
+        reserved_seats.extend(booking[0].split(', '))
+
+    return reserved_seats
+
+def toggle_seat(seat_buttons, seat_id, update_total_price):
+    button = seat_buttons.get(seat_id)  # Safely access the button using get() to avoid errors
+    if button:
+        # Toggle logic here, e.g., changing color or text
+        current_color = button.cget("bg")
+        new_color = "red" if current_color == "gray" else "gray"
+        button.config(bg=new_color)
+        update_total_price(seat_id)
+    else:
+        print(f"Button with seat_id {seat_id} not found!")
+
+# Randomly reserve seats (place this after the imports)
+def get_random_reserved_seats():
+    seats = [f"{chr(row )}{col}" for row in range(ord('A'), ord('F') + 1) for col in range(1, 11)]
+    reserved_seats = random.sample(seats, random.randint(5, 10))  # Randomly reserve 5-10 seats
+    return reserved_seats
+
+def initiate_payment(root, current_user, movie_var, date_entry, time_var, theatre_var, seat_buttons, movie_prices, total_price, total_price_label):
+    selected_seats = [seat_id for seat_id, button in seat_buttons.items() if button.cget("bg") == "red"]
+    if not selected_seats:
+        messagebox.showerror("Error", "Please select at least one seat.")
+        return
+
+    payment_window = tk.Toplevel()
+    payment_window.title("Payment")
+    payment_window.geometry("400x400")
+    payment_window.configure(bg="lightblue")
+
+    tk.Label(payment_window, text="Total Price", bg="lightblue", font=("Arial", 16)).pack(pady=10)
+    tk.Label(payment_window, text=f"₹{total_price:.2f}", bg="lightblue", font=("Arial", 24)).pack(pady=10)
+
+    tk.Label(payment_window, text="Credit Card Number", bg="lightblue", font=("Arial", 14)).pack(pady=5)
+    cc_number_entry = tk.Entry(payment_window, font=("Arial", 14))
+    cc_number_entry.pack(pady=5)
+
+    tk.Label(payment_window, text="Expiry Date (MM/YY)", bg="lightblue", font=("Arial", 14)).pack(pady=5)
+    expiry_date_entry = tk.Entry(payment_window, font=("Arial", 14))
+    expiry_date_entry.pack(pady=5)
+
+    tk.Button(payment_window, text="Pay", command=lambda: complete_payment(payment_window, root, current_user, movie_var, date_entry, time_var, theatre_var, seat_buttons, movie_prices, total_price, cc_number_entry, expiry_date_entry),
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+    tk.Button(payment_window, text="Cancel", command=payment_window.destroy,
+              relief="flat", bg="#FF4C4C", fg="white", font=("Arial", 12)).pack(pady=10)
+
+# Complete payment and generate receipt
+def complete_payment(payment_window, root, current_user, movie_var, date_entry, time_var, theatre_var, seat_buttons, movie_prices, total_price, cc_number_entry, expiry_date_entry):
+    cc_number = cc_number_entry.get().strip()
+    expiry_date = expiry_date_entry.get().strip()
+
+    if not cc_number or not expiry_date:
+        messagebox.showerror("Error", "Please enter all payment details.")
+        return
+
+    # Simulate payment process
+    payment_success = True  # Simulating a successful payment
+    
+    if payment_success:
+        # Get selected seats for the receipt
+        selected_seats = [seat_id for seat_id, button in seat_buttons.items() if button.cget("bg") == "red"]
+
+        # Book the seats (saving booking to the database)
+        book_seat(current_user, movie_var, date_entry, time_var, theatre_var, seat_buttons, movie_prices, None)
+        
+        # Close the payment window
+        payment_window.destroy()
+
+        # Generate receipt with selected seats and total price
+        generate_receipt(root, current_user, movie_var, date_entry, time_var, theatre_var, selected_seats, total_price)
+    else:
+        messagebox.showerror("Payment Error", "Payment failed. Please try again.")
+
+# Book seats and save booking to database
+def book_seat(current_user, movie_var, date_entry, time_var, theatre_var, seat_buttons, movie_prices, total_price_label):
+    selected_seats = [seat_id for seat_id, button in seat_buttons.items() if button.cget("bg") == "red"]
+    if not selected_seats:
+        messagebox.showerror("Error", "No seats selected.")
+        return
+
+    seats_str = ', '.join(selected_seats)
+    total_price = movie_prices[movie_var.get()] * len(selected_seats)
+
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO bookings (username, movie, date, time, theatre, seats, price) VALUES (%s, %s, %s, %s, %s, %s, %s)',
+                   (current_user[0], movie_var.get(), date_entry.get_date(), time_var.get(), theatre_var.get(), seats_str, total_price))
+    conn.commit()
+    conn.close()
+    messagebox.showinfo("Success", "Booking confirmed!")
+
+# View booked seats in a new window with cancel option
+def view_bookings(current_user):
+    bookings_window = Toplevel()
+    bookings_window.title("Your Booked Seats")
+    bookings_window.geometry("600x400")
+    bookings_window.configure(bg="lightblue")
+
+    tk.Label(bookings_window, text="Your Booked Seats", bg="lightblue", font=("Arial", 16)).pack(pady=10)
+
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, movie, date, time, theatre, seats FROM bookings WHERE username=%s', (current_user[0],))
+    bookings = cursor.fetchall()
+    conn.close()
+
+    if bookings:
+        booking_var = tk.StringVar(value="")  # StringVar to hold the selected booking
+        booking_list = tk.Listbox(bookings_window, listvariable=booking_var, height=10, width=80, font=("Arial", 12))
+       
+        
+        # Populate the listbox with booking details
+        for booking in bookings:
+            booking_list.insert(tk.END, f"{booking[0]}: {booking[1]} on {booking[2]} at {booking[3]} in {booking[4]}: Seats {booking[5]}")
+        booking_list.pack(pady=10)
+
+        def cancel_booking():
+            selected_index = booking_list.curselection()  # Get selected booking index
+            if selected_index:
+                selected_booking = bookings[selected_index[0]]
+                booking_id = selected_booking[0]  # Get the booking ID
+                
+                # Confirm cancellation
+                confirm = messagebox.askyesno("Confirm", "Are you sure you want to cancel this booking?")
+                if confirm:
+                    conn = mysql.connector.connect(
+                        host="localhost",
+                        user="root",
+                        password="admin",
+                        database="theatre_db",
+                        auth_plugin='mysql_native_password'
+                    )
+                    cursor = conn.cursor()
+                    cursor.execute('DELETE FROM bookings WHERE id = %s', (booking_id,))
+                    conn.commit()
+                    conn.close()
+                    messagebox.showinfo("Success", "Booking canceled successfully.")
+                    
+                    # Refresh the listbox
+                    bookings_window.destroy()
+                    view_bookings(current_user)
+            else:
+                messagebox.showerror("Error", "Please select a booking to cancel.")
+        
+        # Cancel Booking Button
+        tk.Button(bookings_window, text="Cancel Booking", command=cancel_booking, 
+                  relief="flat", bg="#FF4C4C", fg="white", font=("Arial", 12)).pack(pady=10)
+    else:
+        tk.Label(bookings_window, text="You have no bookings.", bg="lightblue", font=("Arial", 12)).pack(pady=10)
+
+    tk.Button(bookings_window, text="Close", command=bookings_window.destroy,
+              relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+
+
+# Generate receipt
+def generate_receipt(root, current_user, movie_var, date_entry, time_var, theatre_var, selected_seats, total_price):
+    # Create a new window for the receipt
+    receipt_window = Toplevel(root)
+    receipt_window.title("Receipt")
+    receipt_window.geometry("400x400")  # Adjust the window size to make it larger
+
+    # Set up a custom font for the receipt
+    title_font = Font(family="Helvetica", size=18, weight="bold")
+    body_font = Font(family="Helvetica", size=12)
+
+    # Create a frame for padding
+    frame = Frame(receipt_window, padx=20, pady=20)
+    frame.pack(expand=True, fill="both")
+
+    # Join seat numbers into a string for display
+    seat_numbers = ', '.join(selected_seats)
+
+    # Create the title of the receipt
+    receipt_title = Label(frame, text="Receipt", font=title_font, anchor=CENTER)
+    receipt_title.pack(pady=(0, 20))  # Add some space below the title
+
+    # Create the receipt content with larger fonts and more spacing
+    receipt_info = (
+        f"Customer: {current_user[0]}\n\n"
+        f"Movie: {movie_var.get()}\n"
+        f"Date: {date_entry.get_date()}\n"
+        f"Time: {time_var.get()}\n"
+        f"Theatre: {theatre_var.get()}\n"
+        f"Seats: {seat_numbers}\n"
+        f"Total Price: ₹{total_price:.2f}"
+    )
+
+    # Display the receipt info with proper formatting
+    receipt_label = Label(frame, text=receipt_info, font=body_font, justify=CENTER)
+    receipt_label.pack()
+
+    # Add a "Thank you" message at the bottom
+    thank_you_label = Label(frame, text="Thank you for booking with us!", font=body_font, pady=20, anchor=CENTER)
+    thank_you_label.pack(pady=(20, 0))  # Space it a bit from the main content
+
+    # Close button
+    def close_receipt():
+        receipt_window.destroy()
+        if hasattr(root, 'booking_frame'):
+            root.booking_frame.destroy()
+        if hasattr(root, 'login_frame'):
+            root.login_frame.destroy()
+        show_ticket_details(root, current_user)
+
+    tk.Button(frame, text="Close", command=close_receipt, relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+# Show ticket details
+# Show ticket details
+def show_ticket_details(root, current_user):
+    ticket_frame = tk.Frame(root, bg="lightblue")
+    ticket_frame.place(relx=0.5, rely=0.5, anchor=CENTER)
+
+    tk.Label(ticket_frame, text="Your Ticket Details", bg="lightblue", font=("Arial", 16)).pack(pady=10)
+
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="admin",
+        database="theatre_db",
+        auth_plugin='mysql_native_password'
+    )
+    cursor = conn.cursor()
+    cursor.execute('SELECT movie, date, time, theatre, seats FROM bookings WHERE username=%s', (current_user[0],))
+    booking = cursor.fetchone()
+    conn.close()
+
+    if booking:
+        tk.Label(ticket_frame, text="Movie: " + booking[0], bg="lightblue", font=("Arial", 14)).pack(pady=5)
+        tk.Label(ticket_frame, text="Date: " + str(booking[1]), bg="lightblue", font=("Arial", 14)).pack(pady=5)
+        tk.Label(ticket_frame, text="Time: " + booking[2], bg="lightblue", font=("Arial", 14)).pack(pady=5)
+        tk.Label(ticket_frame, text="Theatre: " + booking[3], bg="lightblue", font=("Arial", 14)).pack(pady=5)
+        tk.Label(ticket_frame, text="Seats: " + booking[4], bg="lightblue", font=("Arial", 14)).pack(pady=5)
+    else:
+        tk.Label(ticket_frame, text="No bookings found.", bg="lightblue", font=("Arial", 14)).pack(pady=10)
+
+    # Back button
+    def back_to_home():
+        ticket_frame.pack_forget()
+        show_home_screen(root, current_user)
+
+    tk.Button(ticket_frame, text="Back to Home", command=back_to_home, relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+    # Back to Booking Seats button
+    def back_to_booking_seats():
+        ticket_frame.pack_forget()
+        show_booking_screen(root, current_user)
+
+    tk.Button(ticket_frame, text="Back to Booking Seats", command=back_to_booking_seats, relief="flat", bg="#007BFF", fg="white", font=("Arial", 12)).pack(pady=10)
+
+
+
+# Refresh the booking screen
+def refresh_booking(root, movie_var):
+    if hasattr(root, 'booking_frame'):
+        root.booking_frame.destroy()
+        show_booking_screen(root, [root.current_user[0]], movie_var.get())
+# Main function
+def main():
+    init_db()  # Initialize the database
+    root = tk.Tk()
+    root.title("Theatre Booking System")
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.geometry(f"{screen_width}x{screen_height}")
+
+    # Set the background image
+    set_background_image(root, r"C:\Users\Lenovo\Downloads\DALL·E-2024-09-28-16.33.12-A-luxurious-theater-interior-with-grand_-ornate-details.png", screen_width, screen_height)
+
+    root.current_user = [None]  # Mutable container for current user information
+
+    create_login_widgets(root, root.current_user)
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
